@@ -1,0 +1,43 @@
+syntax = "proto2";
+
+package org.pismery.demo.netty.proto.generate;
+
+option java_package = "org.pismery.demo.netty.proto.generate";
+option java_outer_classname = "Info";
+
+message Message {
+    enum MessageType {
+        RESPONSE = 0;
+        REQUEST = 1;
+    }
+
+    required MessageType message_type = 1;
+
+    oneof body {
+        Response response = 2;
+        Request request = 3;
+    }
+}
+
+message Response {
+    enum ResponseType {
+        SUCCESS = 0;
+        FAILURE = -1;
+    }
+
+    optional ResponseType code = 1 [default = SUCCESS];
+    optional string msg = 2;
+    optional string result = 3;
+}
+
+message Request {
+    enum RequestType {
+        GET = 0;
+        POST = 1;
+        PUT = 2;
+        DELETE = 3;
+    }
+
+    optional RequestType code = 1 [default = GET];
+    optional string msg = 2;
+}
