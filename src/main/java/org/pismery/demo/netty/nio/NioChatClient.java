@@ -15,70 +15,112 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class NioChatClient {
+    private static Selector selector;
 
+    /**
+     * @startuml
+     * Client -> Client: connectToServer
+     *
+     * Client -> Client: doConnected
+     * activate Client
+     *      Client -> Client: handle select key events
+     *      activate Client
+     *          Client -> Client: handle connectable Event
+     *          activate Client
+     *              loop
+     *                  Client -> KeyboardInput: listenKeyboardInput
+     *                  activate KeyboardInput
+     *                      alt input a line
+     *                          KeyboardInput -> Channel: send msg
+     *                      end
+     *                  deactivate KeyboardInput
+     *              end
+     *          deactivate Client
+     *
+     *          Client -> Client: handle readable event
+     *          activate Client
+     *              Client -> Client: read channel Msg
+     *          deactivate Client
+     *      deactivate Client
+     * deactivate Client
+     * @enduml
+     */
     public static void main(String[] args) throws Exception {
+        connectToServer();
+        while (true) {
+            doConnected();
+        }
+    }
+
+    public static void connectToServer() throws Exception {
         SocketChannel socketChannel = SocketChannel.open();
         socketChannel.configureBlocking(false);
 
-        Selector selector = Selector.open();
+        selector = Selector.open();
         socketChannel.register(selector, SelectionKey.OP_CONNECT);
         socketChannel.connect(new InetSocketAddress("127.0.0.1", 8989));
+    }
 
-        while (true) {
-            selector.select();
-            Set<SelectionKey> keySet = selector.selectedKeys();
+    private static void doConnected() throws IOException {
+        selector.select();
+        Set<SelectionKey> keySet = selector.selectedKeys();
+        for (SelectionKey selectionKey : keySet) {
+            if (selectionKey.isConnectable()) {
+                handleConnectable(selectionKey);
+            } else if (selectionKey.isReadable()) {
+                handleReadable(selectionKey);
+            }
+        }
+        keySet.clear();
+    }
 
-            for (SelectionKey selectionKey : keySet) {
-                if (selectionKey.isConnectable()) {
-                    SocketChannel client = (SocketChannel) selectionKey.channel();
+    private static void handleReadable(SelectionKey selectionKey) throws IOException {
+        SocketChannel client = (SocketChannel) selectionKey.channel();
+        ByteBuffer readBuffer = ByteBuffer.allocate(1024);
+        int read = client.read(readBuffer);
+        if (read <= 0) {
+            return;
+        }
 
-                    if (client.isConnectionPending()) {
-                        client.finishConnect();
+        readBuffer.flip();
+        Charset charset = Charset.forName("utf-8");
+        String msg = String.valueOf(charset.decode(readBuffer).array());
+        System.out.println(msg);
+    }
 
-                        ByteBuffer writerBuffer = ByteBuffer.allocate(1024);
-                        writerBuffer.put((LocalDateTime.now() + ": 连接成功").getBytes());
-                        writerBuffer.flip();
-                        client.write(writerBuffer);
+    private static void handleConnectable(SelectionKey selectionKey) throws IOException {
+        SocketChannel client = (SocketChannel) selectionKey.channel();
 
+        if (client.isConnectionPending()) {
+            client.finishConnect();
 
-                        ExecutorService service = Executors.newSingleThreadExecutor();
-                        service.submit(() -> {
-                            while (true) {
-                                writerBuffer.clear();
-                                BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+            ByteBuffer writerBuffer = ByteBuffer.allocate(1024);
+            writerBuffer.put((LocalDateTime.now() + ": 连接成功").getBytes());
+            writerBuffer.flip();
+            client.write(writerBuffer);
 
-                                try {
-                                    String line = br.readLine();
-                                    writerBuffer.put(line.getBytes());
-                                    writerBuffer.flip();
-                                    client.write(writerBuffer);
-                                } catch (IOException e) {
-                                    e.printStackTrace();
-                                }
-                            }
-                        });
+            listenKeyboardInput(client);
 
-                    }
-                    client.register(selector, SelectionKey.OP_READ);
-                    continue;
-                }
+        }
+        client.register(selector, SelectionKey.OP_READ);
+    }
 
-                if (selectionKey.isReadable()) {
-                    SocketChannel client = (SocketChannel) selectionKey.channel();
-                    ByteBuffer readBuffer = ByteBuffer.allocate(1024);
-                    int read = client.read(readBuffer);
-                    if (read <= 0) {
-                        continue;
-                    }
-
-
-                    readBuffer.flip();
-                    Charset charset = Charset.forName("utf-8");
-                    String msg = String.valueOf(charset.decode(readBuffer).array());
-                    System.out.println(new String(readBuffer.array(), 0, read));
+    private static void listenKeyboardInput(SocketChannel client) {
+        ExecutorService service = Executors.newSingleThreadExecutor();
+        service.submit(() -> {
+            ByteBuffer writerBuffer = ByteBuffer.allocate(1024);
+            while (true) {
+                BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+                try {
+                    writerBuffer.clear();
+                    String line = br.readLine();
+                    writerBuffer.put(line.getBytes());
+                    writerBuffer.flip();
+                    client.write(writerBuffer);
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
             }
-            keySet.clear();
-        }
+        });
     }
 }
