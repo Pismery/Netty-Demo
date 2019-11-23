@@ -8,6 +8,7 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -126,7 +127,7 @@ public class NioChatServer {
         }
         buffer.flip();
 
-        Charset charset = Charset.forName("utf-8");
+        Charset charset = StandardCharsets.UTF_8;
         return String.valueOf(charset.decode(buffer).array());
     }
 

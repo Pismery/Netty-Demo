@@ -2,6 +2,7 @@ plugins {
     id 'java'
     id 'com.google.protobuf' version '0.8.8'
 }
+apply plugin: 'idea'
 
 group 'org,pismery.demo'
 version '1.0-SNAPSHOT'
@@ -73,5 +74,12 @@ protobuf {
                 outputSubDir = 'java'
             }
         }
+    }
+}
+
+idea {
+    module {
+        downloadJavadoc = true
+        downloadSources = true
     }
 }
